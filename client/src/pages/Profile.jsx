@@ -1,41 +1,168 @@
-import { useSelector } from "react-redux";
-import { useRef } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { useState, useEffect } from "react";
+import {
+  updateUserStart,
+  updateUserSuccess,
+  updateUserFailure,
+} from "../redux/user/userSlice";
 
 export default function Profile() {
-  const fileRef = useRef();
-  const {currentUser} = useSelector((state) => state.user);
+  const { currentUser, loading, error } = useSelector(
+    (state) => state.user
+  );
+
+
+  const dispatch = useDispatch();
+
+  const [formData, setFormData] = useState({
+    username: "",
+    email: "",
+    password: "",
+  });
+
+  useEffect(() => {
+    if (currentUser) {
+      setFormData({
+        username: currentUser.username || "",
+        email: currentUser.email || "",
+        password: "",
+      });
+    }
+  }, [currentUser]);
+
+  const handleChange = (e) => {
+    const { id, value } = e.target;
+
+    setFormData((prev) => ({
+      ...prev,
+      [id]: value,
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!currentUser?._id) {
+      console.error("User ID is missing:", currentUser);
+      dispatch(updateUserFailure("User ID is missing"));
+      return;
+    }
+
+    try {
+      dispatch(updateUserStart());
+
+      const res = await fetch(
+        `/api/users/update/${currentUser._id}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(formData),
+        }
+      );
+
+      const result = await res.json();
+
+      if (!res.ok || result.success === false) {
+        dispatch(
+          updateUserFailure(
+            result.message || "Failed to update user"
+          )
+        );
+        return;
+      }
+
+      console.log("User updated successfully:", result);
+
+      dispatch(updateUserSuccess(result));
+
+      // Clear password after successful update
+      setFormData((prev) => ({
+        ...prev,
+        password: "",
+      }));
+    } catch (error) {
+      console.error("Update error:", error.message);
+
+      dispatch(updateUserFailure(error.message));
+    }
+  };
+
   return (
-   <div className='p-3 max-w-lg mx-auto'>
-    <h1 className='text-3xl font-semibold text-center
-    my-7'>Profile</h1>
+    <div className="p-3 max-w-lg mx-auto">
+      <h1 className="text-3xl font-semibold text-center my-7">
+        Profile
+      </h1>
 
-    <form className='flex flex-col gap-4'>
-      <input type="file" ref={fileRef} hidden  accept="image/*"/>
-      <img onClick={() => fileRef.current?.click()} src={currentUser?.avatar} alt="Profile" 
-      className='rounded-full h-24 w-24 object-cover cursor-pointer self-center mt-2' />
-          
-        <input type="text" placeholder='username' id='username'
-        className='border p-3 rounded-lg' />
-        <input type="email" placeholder='email' id='email'
-        className='border p-3 rounded-lg' />
-        <input type="password" placeholder='Password' id='password'
-        className='border p-3 rounded-lg' />
-        <button className='bg-slate-700 text-white rounded-lg p-3 uppercase hover:opacity-95 disabled:opacity-80'>
-        update</button>
+      <form
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-4"
+      >
+        {/* Profile image - display only */}
+        <img
+          src={currentUser?.avatar || "/default-avatar.png"}
+          alt="Profile"
+          className="rounded-full h-24 w-24 object-cover self-center mt-2"
+        />
 
+        {/* Username */}
+        <input
+          type="text"
+          placeholder="Username"
+          id="username"
+          value={formData.username}
+          className="border p-3 rounded-lg"
+          onChange={handleChange}
+        />
 
+        {/* Email */}
+        <input
+          type="email"
+          placeholder="Email"
+          id="email"
+          value={formData.email}
+          className="border p-3 rounded-lg"
+          onChange={handleChange}
+        />
+
+        {/* Password */}
+        <input
+          type="password"
+          placeholder="Password"
+          id="password"
+          value={formData.password}
+          className="border p-3 rounded-lg"
+          onChange={handleChange}
+        />
+
+        {/* Update button */}
+        <button
+          type="submit"
+          disabled={loading}
+          className="bg-slate-700 text-white rounded-lg p-3 uppercase hover:opacity-95 disabled:opacity-80"
+        >
+          {loading ? "Updating..." : "Update"}
+        </button>
+
+        {/* Error */}
+        {error && (
+          <p className="text-red-600 text-center">
+            {error}
+          </p>
+        )}
       </form>
 
-      <div className=" flex justify-between mt-5">
-      <span className='text-red-700 cursor-pointer rounded'>
-         Delete Account</span>
+      <div className="flex justify-between mt-5">
+        <span className="text-red-700 cursor-pointer rounded">
+          Delete Account
+        </span>
 
-         <span className='text-red-700 cursor-pointer rounded'>
-         Sign Out</span>
-
+        <span className="text-red-700 cursor-pointer rounded">
+          Sign Out
+        </span>
       </div>
-
-
-   </div>
-  )
+      <p className="text-red-700 mt-5">{error ? error: ''}</p>
+    </div>
+  );
 }
