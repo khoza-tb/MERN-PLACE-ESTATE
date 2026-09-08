@@ -4,13 +4,15 @@ import {
   updateUserStart,
   updateUserSuccess,
   updateUserFailure,
+  deleteUserStart,
+  deleteUserSuccess,
+  deleteUserFailure,
 } from "../redux/user/userSlice";
 
 export default function Profile() {
   const { currentUser, loading, error } = useSelector(
     (state) => state.user
   );
-
 
   const dispatch = useDispatch();
 
@@ -77,7 +79,7 @@ export default function Profile() {
 
       dispatch(updateUserSuccess(result));
 
-      // Clear password after successful update
+      // Clear password field after successful update
       setFormData((prev) => ({
         ...prev,
         password: "",
@@ -86,6 +88,32 @@ export default function Profile() {
       console.error("Update error:", error.message);
 
       dispatch(updateUserFailure(error.message));
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    try {
+      dispatch(deleteUserStart());
+
+      const res = await fetch(
+        `/api/users/delete/${currentUser._id}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        dispatch(deleteUserFailure(data.message));
+        return;
+      }
+
+      dispatch(deleteUserSuccess());
+
+    } catch (error) {
+      dispatch(deleteUserFailure(error.message));
     }
   };
 
@@ -144,17 +172,13 @@ export default function Profile() {
         >
           {loading ? "Updating..." : "Update"}
         </button>
-
-        {/* Error */}
-        {error && (
-          <p className="text-red-600 text-center">
-            {error}
-          </p>
-        )}
       </form>
 
       <div className="flex justify-between mt-5">
-        <span className="text-red-700 cursor-pointer rounded">
+        <span
+          onClick={handleDeleteUser}
+          className="text-red-700 cursor-pointer rounded"
+        >
           Delete Account
         </span>
 
@@ -162,7 +186,12 @@ export default function Profile() {
           Sign Out
         </span>
       </div>
-      <p className="text-red-700 mt-5">{error ? error: ''}</p>
+
+      {error && (
+        <p className="text-red-700 mt-5 text-center">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
