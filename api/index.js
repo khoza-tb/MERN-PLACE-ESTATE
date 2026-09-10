@@ -1,9 +1,11 @@
 import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import cookieParser from "cookie-parser";
+
 import userRoutes from "./routes/user.routes.js";
 import authRoutes from "./routes/auth.route.js";
-import cookieParser from "cookie-parser";
+import listingRoutes from "./routes/listing.route.js";
 
 dotenv.config();
 
@@ -12,12 +14,14 @@ const app = express();
 // =========================
 // MIDDLEWARE
 // =========================
+
 app.use(express.json());
 app.use(cookieParser());
 
 // =========================
 // DATABASE
 // =========================
+
 mongoose
   .connect(process.env.MONGO)
   .then(() => {
@@ -30,6 +34,7 @@ mongoose
 // =========================
 // ROUTES
 // =========================
+
 app.get("/", (req, res) => {
   res.json({
     message: "PrimePlaceEstate API is running",
@@ -38,10 +43,12 @@ app.get("/", (req, res) => {
 
 app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/listing", listingRoutes);
 
 // =========================
 // ERROR HANDLER
 // =========================
+
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
   const message = err.message || "Internal Server Error";
@@ -58,6 +65,7 @@ app.use((err, req, res, next) => {
 // =========================
 // START SERVER
 // =========================
+
 app.listen(3000, () => {
   console.log("🚀 Server is running on port 3000");
 });
