@@ -122,6 +122,9 @@ export const signin = async (req, res, next) => {
 // =========================
 // GOOGLE SIGN IN
 // =========================
+// =========================
+// GOOGLE SIGN IN
+// =========================
 export const google = async (req, res, next) => {
     try {
         const { email, name, photo } = req.body;
@@ -147,7 +150,7 @@ export const google = async (req, res, next) => {
 
             const { password, ...rest } = user._doc;
 
-            res
+            return res
                 .cookie("access_token", token, {
                     httpOnly: true,
                 })
@@ -157,59 +160,74 @@ export const google = async (req, res, next) => {
                     message: "Login successful",
                     user: rest,
                 });
-
-        } else {
-            // Generate username
-            const baseUsername = name
-                ? name.split(" ").join("").toLowerCase()
-                : "user";
-
-            const randomNumber = Math.floor(
-                10000 + Math.random() * 90000
-            );
-
-            const username = `${baseUsername}${randomNumber}`;
-
-            // Generate random password
-            const generatedPassword =
-                Math.random().toString(36).slice(-8);
-
-            const hashedPassword = await bcrypt.hash(
-                generatedPassword,
-                10
-            );
-
-            // Create new user
-            const newUser = new User({
-                username,
-                email,
-                password: hashedPassword,
-                avatar: photo,
-            });
-
-            await newUser.save();
-
-            // Create JWT
-            const token = jwt.sign(
-                {
-                    id: newUser._id,
-                },
-                process.env.JWT_SECRET
-            );
-
-            const { password, ...rest } = newUser._doc;
-
-            res
-                .cookie("access_token", token, {
-                    httpOnly: true,
-                })
-                .status(200)
-                .json({
-                    success: true,
-                    message: "Google login successful",
-                    user: rest,
-                });
         }
+
+        // Generate username
+        const baseUsername = name
+            ? name.split(" ").join("").toLowerCase()
+            : "user";
+
+        const randomNumber = Math.floor(
+            10000 + Math.random() * 90000
+        );
+
+        const username = `${baseUsername}${randomNumber}`;
+
+        // Generate random password
+        const generatedPassword =
+            Math.random().toString(36).slice(-8);
+
+        const hashedPassword = await bcrypt.hash(
+            generatedPassword,
+            10
+        );
+
+        // Create new user
+        const newUser = new User({
+            username,
+            email,
+            password: hashedPassword,
+            avatar: photo,
+        });
+
+        await newUser.save();
+
+        // Create JWT
+        const token = jwt.sign(
+            {
+                id: newUser._id,
+            },
+            process.env.JWT_SECRET
+        );
+
+        const { password, ...rest } = newUser._doc;
+
+        return res
+            .cookie("access_token", token, {
+                httpOnly: true,
+            })
+            .status(200)
+            .json({
+                success: true,
+                message: "Google login successful",
+                user: rest,
+            });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// =========================
+// SIGN OUT
+// =========================
+export const signOut = async (req, res, next) => {
+    try {
+        res.clearCookie("access_token");
+
+        return res.status(200).json({
+            success: true,
+            message: "User has been logged out!",
+        });
     } catch (error) {
         next(error);
     }
