@@ -1,11 +1,11 @@
+
 import {
   GoogleAuthProvider,
-  getAuth,
   signInWithPopup,
 } from "firebase/auth";
 
 import { FaGoogle } from "react-icons/fa";
-import { app } from "../Firebase";
+import { auth } from "../Firebase";
 
 import { useDispatch } from "react-redux";
 
@@ -17,7 +17,7 @@ import {
 
 import { useNavigate } from "react-router-dom";
 
-export default function OAuth() {
+function OAuth() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -25,15 +25,18 @@ export default function OAuth() {
     try {
       dispatch(signInStart());
 
-      // Firebase Google authentication
       const provider = new GoogleAuthProvider();
-      const auth = getAuth(app);
+
+      provider.setCustomParameters({
+        prompt: "select_account",
+      });
+
+      console.log("Starting Google sign-in...");
 
       const result = await signInWithPopup(auth, provider);
 
       console.log("Firebase Google user:", result.user);
 
-      // Send Google user information to backend
       const res = await fetch("/api/auth/google", {
         method: "POST",
         headers: {
@@ -47,47 +50,30 @@ export default function OAuth() {
         }),
       });
 
-      // Read response as text first
-      const responseText = await res.text();
+      const data = await res.json();
 
-      console.log("Backend status:", res.status);
-      console.log("Backend response:", responseText);
+      console.log("Backend Google response:", data);
 
-      // Handle failed request
-      if (!res.ok) {
+      if (!res.ok || data.success === false) {
         dispatch(
           signInFailure(
-            responseText || `Google login failed (${res.status})`
+            data.message || "Google sign-in failed"
           )
         );
-
         return;
       }
-
-      // Make sure backend actually returned something
-      if (!responseText) {
-        dispatch(
-          signInFailure("Backend returned an empty response")
-        );
-
-        return;
-      }
-
-      // Convert response to JSON
-      const data = JSON.parse(responseText);
-
-      console.log("Google login data:", data);
 
       dispatch(signInSuccess(data));
 
       navigate("/");
     } catch (error) {
-      console.error(
-        "Could not sign in with Google:",
-        error
-      );
+      console.error("Google sign-in error:", error);
 
-      dispatch(signInFailure(error.message));
+      dispatch(
+        signInFailure(
+          error.message || "Could not sign in with Google"
+        )
+      );
     }
   };
 
@@ -102,3 +88,5 @@ export default function OAuth() {
     </button>
   );
 }
+
+export default OAuth;
