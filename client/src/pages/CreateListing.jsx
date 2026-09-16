@@ -1,6 +1,84 @@
-import React from "react";
+import React, { useState } from "react";
 
 export default function CreateListing() {
+  const [files, setFiles] = useState([]);
+  const [formData, setFormData] = useState({
+    imageUrls: [],
+  });
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Replace with your Cloudinary details
+  const CLOUD_NAME = "br57zbtw"; 
+  const UPLOAD_PRESET = "ml_default"; // Paste your preset name here
+
+  const handleImageSubmit = async () => {
+  // Check if no files were selected
+  if (!files || files.length === 0) {
+    setError("Please select at least one image before clicking upload.");
+    return;
+  }
+
+  // Check if total images (existing + new) exceed 6
+  if (files.length + formData.imageUrls.length > 6) {
+    setError("You can only upload a maximum of 6 images per listing.");
+    return;
+  }
+
+  setUploading(true);
+  setError(null); // Clear previous errors
+
+  try {
+    const promises = [];
+    for (let i = 0; i < files.length; i++) {
+      promises.push(storeImage(files[i]));
+    }
+
+    const urls = await Promise.all(promises);
+    setFormData({
+      ...formData,
+      imageUrls: formData.imageUrls.concat(urls),
+    });
+
+    // Reset file input state after successful upload
+    setFiles([]);
+  } catch (err) {
+    console.error(err);
+    setError("Image upload failed. Please try again.");
+  } finally {
+    setUploading(false);
+  }
+};
+
+  const storeImage = async (file) => {
+    const data = new FormData();
+    data.append("file", file);
+    data.append("upload_preset", UPLOAD_PRESET);
+    data.append("cloud_name", CLOUD_NAME);
+
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+      {
+        method: "POST",
+        body: data,
+      }
+    );
+
+    const result = await response.json();
+    if (result.secure_url) {
+      return result.secure_url;
+    } else {
+      throw new Error(result.error?.message || "Upload failed");
+    }
+  };
+
+  const handleRemoveImage = (index) => {
+    setFormData({
+      ...formData,
+      imageUrls: formData.imageUrls.filter((_, i) => i !== index),
+    });
+  };
+
   return (
     <main className="p-3 max-w-4xl mx-auto">
       <h1 className="text-3xl font-semibold text-center my-7">
@@ -34,80 +112,152 @@ export default function CreateListing() {
             id="address"
             required
           />
-           
-           <div className=" flex gap-6 flex-wrap">
-            <div className=" flex gap-2">
-                <input type="checkbox" id="sale" className="w-5"/>
-                <span>Sell</span>
-            </div>
-             <div className=" flex gap-2">
-                <input type="checkbox" id="rent" className="w-5"/>
-                <span>Rent</span>
-            </div>
-             <div className=" flex gap-2">
-                <input type="checkbox" id="parking" className="w-5"/>
-                <span>Parking Sport</span>
-            </div>
-             <div className=" flex gap-2">
-                <input type="checkbox" id="furnished" className="w-5"/>
-                <span>Furnished</span>
-            </div>
-             <div className=" flex gap-2">
-                <input type="checkbox" id="other" className="w-5"/>
-                <span>Other</span>
-            </div>
-           </div>
 
-           <div className=" flex flex-wrap gap-6">
+          <div className="flex gap-6 flex-wrap">
+            <div className="flex gap-2">
+              <input type="checkbox" id="sale" className="w-5" />
+              <span>Sell</span>
+            </div>
+
+            <div className="flex gap-2">
+              <input type="checkbox" id="rent" className="w-5" />
+              <span>Rent</span>
+            </div>
+
+            <div className="flex gap-2">
+              <input type="checkbox" id="parking" className="w-5" />
+              <span>Parking Spot</span>
+            </div>
+
+            <div className="flex gap-2">
+              <input type="checkbox" id="furnished" className="w-5" />
+              <span>Furnished</span>
+            </div>
+
+            <div className="flex gap-2">
+              <input type="checkbox" id="other" className="w-5" />
+              <span>Other</span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-6">
             <div className="flex items-center gap-2">
-                <input type="number" id="bedrooms" min={1} max={10} required
-                className="p-3 border border-gray-300 rounded-lg" />
-                <p>Beds</p>
+              <input
+                type="number"
+                id="bedrooms"
+                min={1}
+                max={10}
+                required
+                className="p-3 border border-gray-300 rounded-lg"
+              />
+              <p>Beds</p>
             </div>
-                <div className="flex items-center gap-2">
-                <input type="number" id="bathrooms" min={1} max={10} required
-                className="p-3 border border-gray-300 rounded-lg" />
-                <p>Bathrooms</p>
-            </div>
-                <div className="flex items-center gap-2">
-                <input type="number" id="regularPrice" min={1} max={10} required
-                className="p-3 border border-gray-300 rounded-lg" />
-                <div className="flex flex-col items-center">
-                    <p>RegulaR Price</p>
-                    <span className="text-xs" >($/Month)</span>
-                </div>
-               
-            </div>
-                <div className="flex items-center gap-2">
-                <input type="number" id="discountedPriced" min={1} max={10} required
-                className="p-3 border border-gray-300 rounded-lg" />
-                <div className="flex flex-col items-center">
-                    <p>Discounted Price</p>
-                     <span className="text-xs" >($/Month)</span>
-                </div>
 
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                id="bathrooms"
+                min={1}
+                max={10}
+                required
+                className="p-3 border border-gray-300 rounded-lg"
+              />
+              <p>Bathrooms</p>
             </div>
-           </div>
-          
+
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                id="regularPrice"
+                min={1}
+                required
+                className="p-3 border border-gray-300 rounded-lg"
+              />
+
+              <div className="flex flex-col items-center">
+                <p>Regular Price</p>
+                <span className="text-xs">($/Month)</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                id="discountedPrice"
+                min={1}
+                required
+                className="p-3 border border-gray-300 rounded-lg"
+              />
+
+              <div className="flex flex-col items-center">
+                <p>Discounted Price</p>
+                <span className="text-xs">($/Month)</span>
+              </div>
+            </div>
+          </div>
         </div>
 
+        {/* Right side */}
         <div className="flex flex-col flex-1 gap-4">
-          <p className="font-semibold">Images:
-            <span className="font-normal text-gray-600 ml-2">The first image will be the cover (max 6)</span>
+          <p className="font-semibold">
+            Images:
+            <span className="font-normal text-gray-600 ml-2">
+              The first image will be the cover (max 6)
+            </span>
           </p>
 
           <div className="flex gap-4">
-            <input className="p-3 border border-gray-300 rounded w-full" type="file" id="images" accept="images/*" multiple />
-            <button  className="p-3 text-green-700 border border-green-700 rounded uppercase hover:shadow-lg disabled:opacity-80">Upload</button>
+            <input
+              onChange={(e) => setFiles(e.target.files)}
+              className="p-3 border border-gray-300 rounded w-full"
+              type="file"
+              id="images"
+              accept="image/*"
+              multiple
+            />
+
+            <button
+              type="button"
+              disabled={uploading}
+              onClick={handleImageSubmit}
+              className="p-3 text-green-700 border border-green-700 rounded uppercase hover:shadow-lg disabled:opacity-80"
+            >
+              {uploading ? "Uploading..." : "Upload"}
+            </button>
           </div>
-      
-          <button className="p-3 bg-slate-700 text-white rounded-lg uppercase *:hover:opacity-95">Create Listing</button>
+
+          {error && <p className="text-red-700 text-sm">{error}</p>}
+
+          <button
+            type="submit"
+            className="p-3 bg-slate-700 text-white rounded-lg uppercase hover:opacity-95"
+          >
+            Create Listing
+          </button>
+
+          {/* Uploaded images display */}
+          <div className="flex flex-col gap-2">
+            {formData.imageUrls.map((url, index) => (
+              <div
+                key={url}
+                className="flex justify-between p-3 border items-center rounded-lg"
+              >
+                <img
+                  src={url}
+                  alt={`Listing ${index + 1}`}
+                  className="w-20 h-20 object-contain rounded-lg"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleRemoveImage(index)}
+                  className="p-3 text-red-700 rounded-lg uppercase hover:opacity-75"
+                >
+                  Delete
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
-
-       
-
-
-       
       </form>
     </main>
   );
