@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import User from "../models/user.models.js";
+import Listing from "../models/listing.models.js"; // Added Listing model
 import { errorHandler } from "../utils/error.js";
 
 export const test = (req, res) => {
@@ -12,8 +13,10 @@ export const test = (req, res) => {
 // UPDATE USER
 // =========================
 export const updateUser = async (req, res, next) => {
-  // Make sure the logged-in user is updating their own account
-  if (req.user.id !== req.params.id) {
+  // Check if req.user.id or req.user._id matches the params ID
+  const userId = req.user.id || req.user._id;
+
+  if (userId !== req.params.id) {
     return next(
       errorHandler(403, "You can update only your account!")
     );
@@ -24,6 +27,10 @@ export const updateUser = async (req, res, next) => {
       username: req.body.username,
       email: req.body.email,
     };
+
+    if (req.body.avatar) {
+      updateData.avatar = req.body.avatar;
+    }
 
     // Only change the password if a new password was provided
     if (req.body.password) {
@@ -68,8 +75,9 @@ export const updateUser = async (req, res, next) => {
 // DELETE USER
 // =========================
 export const deleteuser = async (req, res, next) => {
-  // Make sure the logged-in user is deleting their own account
-  if (req.user.id !== req.params.id) {
+  const userId = req.user.id || req.user._id;
+
+  if (userId !== req.params.id) {
     return next(
       errorHandler(
         401,
@@ -80,11 +88,33 @@ export const deleteuser = async (req, res, next) => {
 
   try {
     await User.findByIdAndDelete(req.params.id);
+    res.clearCookie("access_token");
 
     res.status(200).json({
       success: true,
       message: "User has been deleted!",
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// =========================
+// GET USER LISTINGS
+// =========================
+export const getUserListings = async (req, res, next) => {
+  const userId = req.user.id || req.user._id;
+
+  // Verify ownership
+  if (userId !== req.params.id) {
+    return next(
+      errorHandler(401, "You can only view your own listings!")
+    );
+  }
+
+  try {
+    const listings = await Listing.find({ userRef: req.params.id });
+    res.status(200).json(listings);
   } catch (error) {
     next(error);
   }
