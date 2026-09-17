@@ -1,5 +1,5 @@
 import { useSelector, useDispatch } from "react-redux";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
   updateUserStart,
@@ -14,10 +14,8 @@ import {
 } from "../redux/user/userSlice";
 
 export default function Profile() {
-  const { currentUser, loading, error } = useSelector(
-    (state) => state.user
-  );
-
+  const fileRef = useRef(null);
+  const { currentUser, loading, error } = useSelector((state) => state.user);
   const dispatch = useDispatch();
 
   const [formData, setFormData] = useState({
@@ -26,7 +24,6 @@ export default function Profile() {
     password: "",
   });
 
-  // States for user listings and update success message
   const [userListings, setUserListings] = useState([]);
   const [showListingsError, setShowListingsError] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState(false);
@@ -42,11 +39,9 @@ export default function Profile() {
   }, [currentUser]);
 
   const handleChange = (e) => {
-    const { id, value } = e.target;
-
     setFormData((prev) => ({
       ...prev,
-      [id]: value,
+      [e.target.id]: e.target.value,
     }));
   };
 
@@ -60,40 +55,45 @@ export default function Profile() {
 
     try {
       dispatch(updateUserStart());
-      setUpdateSuccess(false); // Reset success state on new submit
+      setUpdateSuccess(false);
 
-      const res = await fetch(
-        `/api/users/update/${currentUser._id}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify(formData),
-        }
-      );
+      // Try plural /api/user/update/ or /api/users/update/ depending on your backend
+      const res = await fetch(`/api/user/update/${currentUser._id}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(formData),
+      });
 
-      const result = await res.json();
-
-      if (!res.ok || result.success === false) {
+      // Prevent JSON syntax errors if the server returns HTML (404/500 page)
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await res.text();
+        console.error("Server returned non-JSON response:", text);
         dispatch(
           updateUserFailure(
-            result.message || "Failed to update user"
+            "Route not found (404). Check backend URL or Vite proxy."
           )
         );
         return;
       }
 
-      dispatch(updateUserSuccess(result.user || result));
-      setUpdateSuccess(true); // Show success message
+      const data = await res.json();
 
-      setFormData((prev) => ({
-        ...prev,
-        password: "",
-      }));
-    } catch (error) {
-      dispatch(updateUserFailure(error.message));
+      if (!res.ok || data.success === false) {
+        dispatch(updateUserFailure(data.message || "Failed to update user"));
+        return;
+      }
+
+      // Safely set the updated user state in Redux
+      const userPayload = data.rest || data.user || data;
+      dispatch(updateUserSuccess(userPayload));
+      setUpdateSuccess(true);
+      setFormData((prev) => ({ ...prev, password: "" }));
+    } catch (err) {
+      dispatch(updateUserFailure(err.message));
     }
   };
 
@@ -101,24 +101,21 @@ export default function Profile() {
     try {
       dispatch(deleteUserStart());
 
-      const res = await fetch(
-        `/api/users/delete/${currentUser._id}`,
-        {
-          method: "DELETE",
-          credentials: "include",
-        }
-      );
+      const res = await fetch(`/api/user/delete/${currentUser._id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
 
       const data = await res.json();
 
-      if (!res.ok) {
-        dispatch(deleteUserFailure(data.message));
+      if (!res.ok || data.success === false) {
+        dispatch(deleteUserFailure(data.message || "Failed to delete account"));
         return;
       }
 
       dispatch(deleteUserSuccess());
-    } catch (error) {
-      dispatch(deleteUserFailure(error.message));
+    } catch (err) {
+      dispatch(deleteUserFailure(err.message));
     }
   };
 
@@ -127,49 +124,45 @@ export default function Profile() {
       dispatch(signOutUserStart());
 
       const res = await fetch("/api/auth/signout");
-
       const data = await res.json();
 
       if (!res.ok || data.success === false) {
-        dispatch(
-          signOutUserFailure(
-            data.message || "Failed to sign out"
-          )
-        );
+        dispatch(signOutUserFailure(data.message || "Failed to sign out"));
         return;
       }
 
       dispatch(signOutUserSuccess());
-    } catch (error) {
-      dispatch(signOutUserFailure(error.message));
+    } catch (err) {
+      dispatch(signOutUserFailure(err.message));
     }
   };
 
-  // =========================
-  // SHOW USER LISTINGS
-  // =========================
   const handleShowListings = async () => {
     try {
       setShowListingsError(false);
-      const res = await fetch(`/api/users/listings/${currentUser._id}`, {
+      const res = await fetch(`/api/user/listings/${currentUser._id}`, {
         credentials: "include",
       });
+
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        setShowListingsError(true);
+        return;
+      }
+
       const data = await res.json();
 
-      if (data.success === false) {
+      if (!res.ok || data.success === false) {
         setShowListingsError(true);
         return;
       }
 
       setUserListings(data);
-    } catch (error) {
+    } catch (err) {
       setShowListingsError(true);
     }
   };
 
-  // =========================
-  // DELETE A LISTING
-  // =========================
   const handleListingDelete = async (listingId) => {
     try {
       const res = await fetch(`/api/listing/delete/${listingId}`, {
@@ -178,30 +171,30 @@ export default function Profile() {
       });
       const data = await res.json();
 
-      if (data.success === false) {
-        console.log(data.message);
+      if (!res.ok || data.success === false) {
+        console.error(data.message);
         return;
       }
 
       setUserListings((prev) =>
         prev.filter((listing) => listing._id !== listingId)
       );
-    } catch (error) {
-      console.log(error.message);
+    } catch (err) {
+      console.error(err.message);
     }
   };
 
   return (
     <div className="p-3 max-w-lg mx-auto">
-      <h1 className="text-3xl font-semibold text-center my-7">
-        Profile
-      </h1>
+      <h1 className="text-3xl font-semibold text-center my-7">Profile</h1>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <input type="file" ref={fileRef} hidden accept="image/*" />
         <img
+          onClick={() => fileRef.current?.click()}
           src={currentUser?.avatar || "/default-avatar.png"}
           alt="Profile"
-          className="rounded-full h-24 w-24 object-cover self-center mt-2"
+          className="rounded-full h-24 w-24 object-cover self-center mt-2 cursor-pointer"
         />
 
         <input
@@ -242,7 +235,7 @@ export default function Profile() {
 
       <Link
         className="bg-green-700 text-white rounded-lg p-3 uppercase text-center hover:opacity-95 block mt-4"
-        to={"/create-listing"}
+        to="/create-listing"
       >
         Create Listing
       </Link>
@@ -250,43 +243,38 @@ export default function Profile() {
       <div className="flex justify-between mt-5">
         <span
           onClick={handleDeleteUser}
-          className="text-red-700 cursor-pointer rounded"
+          className="text-red-700 cursor-pointer hover:underline"
         >
           Delete Account
         </span>
 
         <span
           onClick={handleSignOut}
-          className="text-red-700 cursor-pointer rounded"
+          className="text-red-700 cursor-pointer hover:underline"
         >
           Sign Out
         </span>
       </div>
 
-      {/* Error and Success Messages */}
       {error && <p className="text-red-700 mt-5 text-center">{error}</p>}
-      
+
       {updateSuccess && (
-        <p className="text-red-700 mt-5 text-center">
-          User is updated successfully!
+        <p className="text-green-700 mt-5 text-center">
+          User updated successfully!
         </p>
       )}
 
-      {/* Show Listings Button */}
       <button
         onClick={handleShowListings}
-        className="text-green-700 w-full mt-5 font-semibold text-center"
+        className="text-green-700 w-full mt-5 font-semibold text-center hover:underline"
       >
         Show Listings
       </button>
 
       {showListingsError && (
-        <p className="text-red-700 mt-2 text-center">
-          Error showing listings
-        </p>
+        <p className="text-red-700 mt-2 text-center">Error showing listings</p>
       )}
 
-      {/* Render Listings */}
       {userListings && userListings.length > 0 && (
         <div className="flex flex-col gap-4 mt-6">
           <h1 className="text-center text-2xl font-semibold">Your Listings</h1>

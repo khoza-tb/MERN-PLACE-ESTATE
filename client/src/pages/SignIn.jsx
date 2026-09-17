@@ -10,7 +10,7 @@ import OAuth from '../components/OAuth';
 
 export default function SignIn() {
   const [formData, setFormData] = useState({});
-   const {loading, error} = useSelector((state) => state.user);
+  const { loading, error } = useSelector((state) => state.user);
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -37,17 +37,18 @@ export default function SignIn() {
       });
 
       const data = await res.json();
-      console.log(data);
 
-      if (data.success === false) {
-        dispatch(signInFailure(data.message));
+      if (!res.ok || data.success === false) {
+        dispatch(signInFailure(data.message || 'Sign in failed'));
         return;
       }
 
-      dispatch(signInSuccess(data));
+      // Safely extract user data whether it's wrapped or direct
+      const userPayload = data.rest || data.user || data;
+      dispatch(signInSuccess(userPayload));
       navigate('/');
-    } catch (error) {
-      dispatch(signInFailure(error.message));
+    } catch (err) {
+      dispatch(signInFailure(err.message));
     }
   };
 
@@ -80,15 +81,15 @@ export default function SignIn() {
         >
           {loading ? 'Loading...' : 'Sign In'}
         </button>
-        <OAuth/>
-
-
+        
+        <OAuth />
       </form>
 
       <div className="flex gap-2 mt-5">
         <p>Don't have an account?</p>
 
-        <Link to="/signup">
+        {/* Updated path from /signup to /sign-up */}
+        <Link to="/sign-up">
           <span className="text-blue-700 hover:underline">
             Sign Up
           </span>

@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import User from "../models/user.models.js";
-import Listing from "../models/listing.models.js"; // Added Listing model
+import Listing from "../models/listing.models.js";
 import { errorHandler } from "../utils/error.js";
 
 export const test = (req, res) => {
@@ -13,7 +13,6 @@ export const test = (req, res) => {
 // UPDATE USER
 // =========================
 export const updateUser = async (req, res, next) => {
-  // Check if req.user.id or req.user._id matches the params ID
   const userId = req.user.id || req.user._id;
 
   if (userId !== req.params.id) {
@@ -32,7 +31,6 @@ export const updateUser = async (req, res, next) => {
       updateData.avatar = req.body.avatar;
     }
 
-    // Only change the password if a new password was provided
     if (req.body.password) {
       updateData.password = await bcrypt.hash(
         req.body.password,
@@ -40,25 +38,24 @@ export const updateUser = async (req, res, next) => {
       );
     }
 
+    // Updated 'new: true' to 'returnDocument: "after"' to resolve Mongoose deprecation warning
     const updatedUser = await User.findByIdAndUpdate(
       req.params.id,
       {
         $set: updateData,
       },
       {
-        new: true,
+        returnDocument: "after",
         runValidators: true,
       }
     );
 
-    // User doesn't exist
     if (!updatedUser) {
       return next(
         errorHandler(404, "User not found")
       );
     }
 
-    // Don't send password back to frontend
     const { password, ...rest } = updatedUser._doc;
 
     res.status(200).json({
@@ -74,7 +71,8 @@ export const updateUser = async (req, res, next) => {
 // =========================
 // DELETE USER
 // =========================
-export const deleteuser = async (req, res, next) => {
+// Renamed export from deleteuser -> deleteUser to fix route import crash
+export const deleteUser = async (req, res, next) => {
   const userId = req.user.id || req.user._id;
 
   if (userId !== req.params.id) {
@@ -105,7 +103,6 @@ export const deleteuser = async (req, res, next) => {
 export const getUserListings = async (req, res, next) => {
   const userId = req.user.id || req.user._id;
 
-  // Verify ownership
   if (userId !== req.params.id) {
     return next(
       errorHandler(401, "You can only view your own listings!")

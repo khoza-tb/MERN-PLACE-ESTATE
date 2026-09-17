@@ -1,20 +1,15 @@
-
 import {
   GoogleAuthProvider,
   signInWithPopup,
 } from "firebase/auth";
-
 import { FaGoogle } from "react-icons/fa";
 import { auth } from "../Firebase";
-
 import { useDispatch } from "react-redux";
-
 import {
   signInStart,
   signInSuccess,
   signInFailure,
 } from "../redux/user/userSlice";
-
 import { useNavigate } from "react-router-dom";
 
 function OAuth() {
@@ -26,16 +21,11 @@ function OAuth() {
       dispatch(signInStart());
 
       const provider = new GoogleAuthProvider();
-
       provider.setCustomParameters({
         prompt: "select_account",
       });
 
-      console.log("Starting Google sign-in...");
-
       const result = await signInWithPopup(auth, provider);
-
-      console.log("Firebase Google user:", result.user);
 
       const res = await fetch("/api/auth/google", {
         method: "POST",
@@ -52,8 +42,6 @@ function OAuth() {
 
       const data = await res.json();
 
-      console.log("Backend Google response:", data);
-
       if (!res.ok || data.success === false) {
         dispatch(
           signInFailure(
@@ -63,12 +51,13 @@ function OAuth() {
         return;
       }
 
-      dispatch(signInSuccess(data));
+      // Safely extract the user object whether wrapped or direct
+      const userPayload = data.rest || data.user || data;
+      dispatch(signInSuccess(userPayload));
 
       navigate("/");
     } catch (error) {
       console.error("Google sign-in error:", error);
-
       dispatch(
         signInFailure(
           error.message || "Could not sign in with Google"
@@ -81,9 +70,9 @@ function OAuth() {
     <button
       onClick={handleGoogleClick}
       type="button"
-      className="bg-red-700 text-white p-3 rounded-lg uppercase hover:opacity-95 w-full transition-opacity"
+      className="bg-red-700 text-white p-3 rounded-lg uppercase hover:opacity-95 w-full transition-opacity flex items-center justify-center gap-2"
     >
-      <FaGoogle className="inline mr-2" />
+      <FaGoogle />
       Continue with Google
     </button>
   );

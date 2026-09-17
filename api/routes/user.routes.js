@@ -3,7 +3,7 @@ import express from "express";
 import {
   test,
   updateUser,
-  deleteuser,
+  deleteUser,
   getUserListings,
 } from "../controllers/user.controller.js";
 
@@ -25,7 +25,7 @@ router.post(
 router.delete(
   "/delete/:id",
   verifyToken,
-  deleteuser
+  deleteUser // 👈 Capitalized 'U' here
 );
 
 router.get('/listings/:id', verifyToken, getUserListings);

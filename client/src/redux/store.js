@@ -1,25 +1,19 @@
-import { combineReducers, configureStore } from '@reduxjs/toolkit';
-import userReducer from './user/userSlice.js';
-import storage from 'redux-persist/lib/storage';
-import { 
-  persistReducer, 
-  persistStore,
-  FLUSH,
-  REHYDRATE,
-  PAUSE,
-  PERSIST,
-  PURGE,
-  REGISTER,
-} from 'redux-persist';
+import { combineReducers, configureStore } from "@reduxjs/toolkit";
+import userReducer from "./user/userSlice";
+import { persistReducer, persistStore } from "redux-persist";
 
-const rootReducer = combineReducers({
-  user: userReducer,
-});
+// Safe localStorage wrapper to prevent Vite / Webpack bundle errors
+const localStorageWrapper = {
+  getItem: (key) => Promise.resolve(localStorage.getItem(key)),
+  setItem: (key, value) => Promise.resolve(localStorage.setItem(key, value)),
+  removeItem: (key) => Promise.resolve(localStorage.removeItem(key)),
+};
+
+const rootReducer = combineReducers({ user: userReducer });
 
 const persistConfig = {
-  key: 'root',
-  // FIX HERE: Extract the inner storage object if Vite bundles it as a default module object
-  storage: storage.default || storage, 
+  key: "root",
+  storage: localStorageWrapper,
   version: 1,
 };
 
@@ -29,9 +23,7 @@ export const store = configureStore({
   reducer: persistedReducer,
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      serializableCheck: {
-        ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
-      },
+      serializableCheck: false,
     }),
 });
 

@@ -2,7 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
-import cors from "cors"; // 1. Import cors
+import cors from "cors";
 
 import userRoutes from "./routes/user.routes.js";
 import authRoutes from "./routes/auth.route.js";
@@ -16,11 +16,10 @@ const app = express();
 // MIDDLEWARE
 // =========================
 
-// 2. Enable CORS with credentials support
 app.use(
   cors({
-    origin: "http://localhost:5173", // URL of your React frontend
-    credentials: true,               // Allows cookies to be sent back and forth
+    origin: "http://localhost:5173",
+    credentials: true,
   })
 );
 
@@ -50,7 +49,8 @@ app.get("/", (req, res) => {
   });
 });
 
-app.use("/api/users", userRoutes);
+// Fixed route prefix from /api/users to /api/user
+app.use("/api/user", userRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/listing", listingRoutes);
 
