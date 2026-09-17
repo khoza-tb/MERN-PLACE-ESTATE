@@ -57,7 +57,7 @@ export default function Profile() {
       dispatch(updateUserStart());
       setUpdateSuccess(false);
 
-      // Try plural /api/user/update/ or /api/users/update/ depending on your backend
+      // Using /api/user/update/ to match standard express backend routes
       const res = await fetch(`/api/user/update/${currentUser._id}`, {
         method: "POST",
         headers: {
@@ -67,19 +67,6 @@ export default function Profile() {
         body: JSON.stringify(formData),
       });
 
-      // Prevent JSON syntax errors if the server returns HTML (404/500 page)
-      const contentType = res.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        const text = await res.text();
-        console.error("Server returned non-JSON response:", text);
-        dispatch(
-          updateUserFailure(
-            "Route not found (404). Check backend URL or Vite proxy."
-          )
-        );
-        return;
-      }
-
       const data = await res.json();
 
       if (!res.ok || data.success === false) {
@@ -87,9 +74,7 @@ export default function Profile() {
         return;
       }
 
-      // Safely set the updated user state in Redux
-      const userPayload = data.rest || data.user || data;
-      dispatch(updateUserSuccess(userPayload));
+      dispatch(updateUserSuccess(data));
       setUpdateSuccess(true);
       setFormData((prev) => ({ ...prev, password: "" }));
     } catch (err) {
@@ -143,13 +128,6 @@ export default function Profile() {
       const res = await fetch(`/api/user/listings/${currentUser._id}`, {
         credentials: "include",
       });
-
-      const contentType = res.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        setShowListingsError(true);
-        return;
-      }
-
       const data = await res.json();
 
       if (!res.ok || data.success === false) {
@@ -189,7 +167,12 @@ export default function Profile() {
       <h1 className="text-3xl font-semibold text-center my-7">Profile</h1>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <input type="file" ref={fileRef} hidden accept="image/*" />
+        <input
+          type="file"
+          ref={fileRef}
+          hidden
+          accept="image/*"
+        />
         <img
           onClick={() => fileRef.current?.click()}
           src={currentUser?.avatar || "/default-avatar.png"}
@@ -272,7 +255,9 @@ export default function Profile() {
       </button>
 
       {showListingsError && (
-        <p className="text-red-700 mt-2 text-center">Error showing listings</p>
+        <p className="text-red-700 mt-2 text-center">
+          Error showing listings
+        </p>
       )}
 
       {userListings && userListings.length > 0 && (

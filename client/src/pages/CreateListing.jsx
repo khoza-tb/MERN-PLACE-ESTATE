@@ -94,33 +94,40 @@ export default function CreateListing() {
   };
 
   const handleChange = (e) => {
-    if (e.target.id === "sale" || e.target.id === "rent") {
-      setFormData({
-        ...formData,
-        type: e.target.id,
-      });
+    const { id, type, checked, value } = e.target;
+
+    // Handle Sale/Rent Radio Checkbox toggles
+    if (id === "sale" || id === "rent") {
+      setFormData((prev) => ({
+        ...prev,
+        type: id,
+      }));
+      return;
     }
 
-    if (
-      e.target.id === "parking" ||
-      e.target.id === "furnished" ||
-      e.target.id === "offer"
-    ) {
-      setFormData({
-        ...formData,
-        [e.target.id]: e.target.checked,
-      });
+    // Handle Checkboxes
+    if (id === "parking" || id === "furnished" || id === "offer") {
+      setFormData((prev) => ({
+        ...prev,
+        [id]: checked,
+      }));
+      return;
     }
 
-    if (
-      e.target.type === "text" ||
-      e.target.type === "textarea" ||
-      e.target.type === "number"
-    ) {
-      setFormData({
-        ...formData,
-        [e.target.id]: e.target.value,
-      });
+    // Handle Text, Textarea, and Numbers cleanly
+    if (type === "number") {
+      setFormData((prev) => ({
+        ...prev,
+        [id]: Number(value),
+      }));
+      return;
+    }
+
+    if (type === "text" || type === "textarea") {
+      setFormData((prev) => ({
+        ...prev,
+        [id]: value,
+      }));
     }
   };
 
@@ -131,7 +138,7 @@ export default function CreateListing() {
       return setError("You must upload at least one image.");
     }
 
-    if (formData.offer && +formData.discountPrice >= +formData.regularPrice) {
+    if (formData.offer && Number(formData.discountPrice) >= Number(formData.regularPrice)) {
       return setError("Discount price must be lower than regular price.");
     }
 
@@ -306,10 +313,13 @@ export default function CreateListing() {
 
               <div className="flex flex-col items-center">
                 <p>Regular Price</p>
-                <span className="text-xs">($/Month)</span>
+                {formData.type === "rent" && (
+                  <span className="text-xs">($/Month)</span>
+                )}
               </div>
             </div>
 
+            {/* Render discount price field when Offer checkbox is checked */}
             {formData.offer && (
               <div className="flex items-center gap-2">
                 <input
@@ -325,7 +335,9 @@ export default function CreateListing() {
 
                 <div className="flex flex-col items-center">
                   <p>Discounted Price</p>
-                  <span className="text-xs">($/Month)</span>
+                  {formData.type === "rent" && (
+                    <span className="text-xs">($/Month)</span>
+                  )}
                 </div>
               </div>
             )}
@@ -371,7 +383,6 @@ export default function CreateListing() {
 
           {error && <p className="text-red-700 text-sm">{error}</p>}
 
-          {/* Uploaded images display */}
           <div className="flex flex-col gap-2">
             {formData.imageUrls.map((url, index) => (
               <div
