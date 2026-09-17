@@ -2,6 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
+import cors from "cors"; // 1. Import cors
 
 import userRoutes from "./routes/user.routes.js";
 import authRoutes from "./routes/auth.route.js";
@@ -14,6 +15,14 @@ const app = express();
 // =========================
 // MIDDLEWARE
 // =========================
+
+// 2. Enable CORS with credentials support
+app.use(
+  cors({
+    origin: "http://localhost:5173", // URL of your React frontend
+    credentials: true,               // Allows cookies to be sent back and forth
+  })
+);
 
 app.use(express.json());
 app.use(cookieParser());
