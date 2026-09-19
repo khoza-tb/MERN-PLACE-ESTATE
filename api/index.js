@@ -14,38 +14,6 @@ dotenv.config({
 });
 
 // =====================================================
-// ENVIRONMENT CHECK
-// =====================================================
-
-console.log("=================================");
-console.log("ENVIRONMENT CHECK");
-console.log("=================================");
-
-console.log(
-  "MONGO:",
-  process.env.MONGO ? "LOADED" : "NOT LOADED"
-);
-
-console.log(
-  "RESEND API KEY:",
-  process.env.RESEND_API_KEY
-    ? "LOADED"
-    : "NOT LOADED"
-);
-
-console.log(
-  "RESEND FROM:",
-  process.env.RESEND_FROM_EMAIL || "NOT SET"
-);
-
-console.log(
-  "INQUIRY RECEIVER:",
-  process.env.INQUIRY_RECEIVER_EMAIL || "NOT SET"
-);
-
-console.log("=================================");
-
-// =====================================================
 // ROUTES
 // =====================================================
 
@@ -55,7 +23,6 @@ import userRoutes from "./routes/user.route.js";
 import favoriteRoutes from "./routes/favorite.route.js";
 import inquiryRoutes from "./routes/inquiry.route.js";
 import adminRoutes from "./routes/admin.route.js";
-
 
 // =====================================================
 // APP
@@ -67,19 +34,39 @@ const app = express();
 // MIDDLEWARE
 // =====================================================
 
-// Parse JSON requests
 app.use(express.json());
-
-// Parse cookies
 app.use(cookieParser());
 
 // =====================================================
 // CORS
 // =====================================================
 
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://prime-place-estates-web.vercel.app",
+];
+
+if (process.env.CLIENT_URL) {
+  allowedOrigins.push(process.env.CLIENT_URL);
+}
+
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: (origin, callback) => {
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      console.error("CORS BLOCKED:", origin);
+
+      return callback(
+        new Error("Not allowed by CORS")
+      );
+    },
     credentials: true,
   })
 );
@@ -89,16 +76,10 @@ app.use(
 // =====================================================
 
 app.use("/api/auth", authRoutes);
-
 app.use("/api/listing", listingRoutes);
-
 app.use("/api/user", userRoutes);
-
 app.use("/api/favorite", favoriteRoutes);
-
-// FIXED: inquiry route is singular
 app.use("/api/inquiry", inquiryRoutes);
-
 app.use("/api/admin", adminRoutes);
 
 // =====================================================
@@ -117,17 +98,12 @@ app.get("/", (req, res) => {
 // =====================================================
 
 app.use((err, req, res, next) => {
-  const statusCode =
-    err.statusCode || 500;
+  console.error("SERVER ERROR:", err);
+
+  const statusCode = err.statusCode || 500;
 
   const message =
-    err.message ||
-    "Internal Server Error";
-
-  console.error(
-    "SERVER ERROR:",
-    err
-  );
+    err.message || "Internal Server Error";
 
   res.status(statusCode).json({
     success: false,
@@ -137,26 +113,59 @@ app.use((err, req, res, next) => {
 });
 
 // =====================================================
-// MONGODB CONNECTION + SERVER
+// MONGODB CONNECTION
 // =====================================================
 
-mongoose
-  .connect(process.env.MONGO)
-  .then(() => {
-    console.log(
-      "✅ Connected to MongoDB"
-    );
+let isConnected = false;
 
-    app.listen(3000, () => {
-      console.log(
-        "🚀 Server running on port 3000"
-      );
-    });
-  })
-  .catch((error) => {
+const connectToDatabase = async () => {
+  if (isConnected) {
+    return;
+  }
+
+  if (!process.env.MONGO) {
+    throw new Error(
+      "MONGO environment variable is not configured"
+    );
+  }
+
+  try {
+    await mongoose.connect(process.env.MONGO);
+
+    isConnected = true;
+
+    console.log("✅ Connected to MongoDB");
+  } catch (error) {
     console.error(
       "❌ MongoDB connection error:",
       error
     );
-  });
+
+    throw error;
+  }
+};
+
+// =====================================================
+// VERCEL HANDLER
+// =====================================================
+
+export default async function handler(req, res) {
+  try {
+    await connectToDatabase();
+
+    return app(req, res);
+  } catch (error) {
+    console.error(
+      "❌ API HANDLER ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message:
+        error.message || "Internal Server Error",
+    });
+  }
+}
 
