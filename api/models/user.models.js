@@ -1,25 +1,43 @@
 import mongoose from "mongoose";
 
-const userSchema = new mongoose.Schema({
-  username: {
-    type: String,
-    required: true,
-    unique: true
+const userSchema = new mongoose.Schema(
+  {
+    username: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+    },
+
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      lowercase: true,
+    },
+
+    password: {
+      type: String,
+      required: true,
+    },
+
+    avatar: {
+      type: String,
+      default:
+        "https://cdn-icons-png.flaticon.com/512/149/149071.png",
+    },
+
+    role: {
+      type: String,
+      enum: ["user", "agent", "admin"],
+      default: "user",
+    },
   },
-  email: {
-    type: String,
-    required: true,
-    unique: true
-  },
-  password: {
-    type: String,
-    required: true
-  }, 
-  avatar: {
-    type: String,
-    default: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBwgHBgkIBwgKCgkLDRYPDQwMDRsUFRAWIB0iIiAdHx8kKDQsJCYxJx8fLT0tMTU3Ojo6Iys/RD84QzQ5OjcBCgoKDQwNGg8PGjclHyU3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3N//AABEIAJQArwMBIgACEQEDEQH/xAAbAAEAAwEBAQEAAAAAAAAAAAAAAQUGBAIDB//EADkQAAIBAgIHBAYJBQAAAAAAAAABAgMEBREVITFBUVOhEhNhcSJCQ3KBkRQjMjNSYrHR4SSSovDx/8QAFgEBAQEAAAAAAAAAAAAAAAAAAAEC/8QAFhEBAQEAAAAAAAAAAAAAAAAAAAER/9oADAMBAAIRAxEAPwD9bABUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAk8VKkKUe1UnGC8XkV9/iapSlToZSnvluRTVKk6su1UlKTe9sYNBLE7OL+8b92LYhilnJ5d6170GjOguDWQqQqLOE4yXGLPRlKdSpSkpUpyhJb4subDE1VapV/Rnuluf8jBZAAgAAAAAAAAAAAAAAAAFdi946EO5pvKc9r4IsG1FOUnkltfAy1eq69adWW2bzy4CFfMAGkAAQAABfYTduvTdKo/rILbxRYGWtqzoXFOqvVevxW81CaaTTzT1pirEgAgAAAAAAAAAAAAAOXEp9ixrNb45fMzZocXX9BPzX6meLEoAAAAAAACTSYdPvLGjL8uXy1GaNFhKysKfx/VhXYACAAAAAAAAAAAAAA+N7T720qwW1xeXmZfca4zeI2/0a6lFfYeuPkWDlAAQAAAAADUWdPurWlB7YxWZRYdb/SLmKa9CHpSfhwNHv8AEVQAEAAAAAAAAAAAAAAOe+tY3dFxbymtcZf7xOgAZSpTnSm4VI9mS2o8Gmu7SldRyqRyl6sltRT3GF3FLXBd7H8u35FHCD3KnUi8pQkn4piNOpN5RhN+UWEeD3Spyq1FCnFylwR2W+F3FRp1MqUeL2/IuLW0pWscqa1vbJ7WNVFlaxtaPYWuW2T4s6ACAAAAAAAAAAAAAAAb8uJwXmJ0qDcKaVSa4PUviB36uJy1sRtaP2qnafCGsorm8r3D+tm8vwrUj4FxNW9TGln9VR+M2c8sXuXs7teSzOAAdjxO8ftf8V+wWJ3a9qv7F+xxgCxhi9ytqg17p96WMx9rRa8YvMpwBpKN/bV9UKiT4S1M6jInTbX1e2yVOecN8Ja0MNaUHFZ4jSuGoy9Co9kW9vkztIoAAAAAAAAQ2km20ktrb2ElLi965ydCk/Rjqm+L4AecQxKVXOlQfZpbG/xfwVoBQAAQAAAAAAAAAAE+OeTLTDsScMqVw847qj2rzKoBWtJKjB7zNq2qNvL7t+HAtyAAAAAA57+v9GtpVF9p6o+bMz48S2x6prpU9yzkypLAAAQAAAAAAAAAAAAAAABMW4yUovJrYzT2lZXFvTqr1lr8zLl1gU26NSm3qjLNLhn/AMJVWgAAAAD4V7ahWkpVaalJas2eNH2nIj1AKGj7TkR6jR9pyI9SQERo+05Eeo0faciPUkARo+05Eeo0faciPUkARo+05Eeo0faciPUkARo+05Eeo0faciPUkARo+05Eeo0faciPUkARo+05Eeo0faciPUkARo+05Eep9aNtRoZujTUW9uQBKr6gAD//2Q=="
-  },
-}, { timestamps: true });
+  {
+    timestamps: true,
+  }
+);
 
 const User = mongoose.model("User", userSchema);
 

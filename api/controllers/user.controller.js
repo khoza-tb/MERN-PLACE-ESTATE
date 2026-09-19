@@ -1,11 +1,13 @@
-import bcrypt from "bcryptjs";
 import User from "../models/user.models.js";
 import Listing from "../models/listing.models.js";
 import { errorHandler } from "../utils/error.js";
 
+// =========================
+// TEST
+// =========================
 export const test = (req, res) => {
   res.json({
-    message: "API is running",
+    message: "User route is working!",
   });
 };
 
@@ -13,56 +15,36 @@ export const test = (req, res) => {
 // UPDATE USER
 // =========================
 export const updateUser = async (req, res, next) => {
-  const userId = req.user.id || req.user._id;
-
-  if (userId !== req.params.id) {
-    return next(
-      errorHandler(403, "You can update only your account!")
-    );
-  }
-
   try {
-    const updateData = {
-      username: req.body.username,
-      email: req.body.email,
-    };
-
-    if (req.body.avatar) {
-      updateData.avatar = req.body.avatar;
-    }
-
-    if (req.body.password) {
-      updateData.password = await bcrypt.hash(
-        req.body.password,
-        10
+    if (req.user.id !== req.params.id) {
+      return next(
+        errorHandler(401, "You can only update your own account!")
       );
     }
 
-    // Updated 'new: true' to 'returnDocument: "after"' to resolve Mongoose deprecation warning
     const updatedUser = await User.findByIdAndUpdate(
       req.params.id,
       {
-        $set: updateData,
+        $set: {
+          username: req.body.username,
+          email: req.body.email,
+          password: req.body.password,
+          photo: req.body.photo,
+        },
       },
       {
-        returnDocument: "after",
-        runValidators: true,
+        new: true,
       }
     );
 
     if (!updatedUser) {
-      return next(
-        errorHandler(404, "User not found")
-      );
+      return next(errorHandler(404, "User not found!"));
     }
 
-    const { password, ...rest } = updatedUser._doc;
+    const { password, ...userWithoutPassword } =
+      updatedUser._doc;
 
-    res.status(200).json({
-      success: true,
-      message: "User updated successfully",
-      user: rest,
-    });
+    res.status(200).json(userWithoutPassword);
   } catch (error) {
     next(error);
   }
@@ -71,21 +53,16 @@ export const updateUser = async (req, res, next) => {
 // =========================
 // DELETE USER
 // =========================
-// Renamed export from deleteuser -> deleteUser to fix route import crash
 export const deleteUser = async (req, res, next) => {
-  const userId = req.user.id || req.user._id;
-
-  if (userId !== req.params.id) {
-    return next(
-      errorHandler(
-        401,
-        "You can only delete your own account!"
-      )
-    );
-  }
-
   try {
+    if (req.user.id !== req.params.id) {
+      return next(
+        errorHandler(401, "You can only delete your own account!")
+      );
+    }
+
     await User.findByIdAndDelete(req.params.id);
+
     res.clearCookie("access_token");
 
     res.status(200).json({
@@ -101,18 +78,16 @@ export const deleteUser = async (req, res, next) => {
 // GET USER LISTINGS
 // =========================
 export const getUserListings = async (req, res, next) => {
-  const userId = req.user.id || req.user._id;
-
-  if (userId !== req.params.id) {
-    return next(
-      errorHandler(401, "You can only view your own listings!")
-    );
-  }
-
   try {
-    const listings = await Listing.find({ userRef: req.params.id });
+    const listings = await Listing.find({
+      userRef: req.params.id,
+    }).sort({
+      createdAt: -1,
+    });
+
     res.status(200).json(listings);
   } catch (error) {
+    console.error("GET USER LISTINGS ERROR:", error);
     next(error);
   }
 };

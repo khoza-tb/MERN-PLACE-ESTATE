@@ -1,171 +1,1055 @@
+
 import User from "../models/user.models.js";
 import bcrypt from "bcryptjs";
-import { errorHandler } from "../utils/error.js";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
-// Cookie options for dev consistency
+import { errorHandler } from "../utils/error.js";
+
+// =====================================================
+// COOKIE OPTIONS
+// =====================================================
+
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 1 day expiration
+  sameSite: "lax",
+  secure: false, // localhost development
+  maxAge: 24 * 60 * 60 * 1000, // 1 day
 };
 
-// =========================
-// SIGN UP
-// =========================
-export const signup = async (req, res, next) => {
-  try {
-    const { username, email, password } = req.body;
+// =====================================================
+// CREATE JWT TOKEN
+// =====================================================
 
-    if (!username || !email || !password) {
+const createToken = (user) => {
+  if (!process.env.JWT_SECRET) {
+    throw new Error(
+      "JWT_SECRET is not configured in the environment."
+    );
+  }
+
+  return jwt.sign(
+    {
+      id: user._id.toString(),
+      _id: user._id.toString(),
+      role: user.role || "user",
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: "1d",
+    }
+  );
+};
+
+// =====================================================
+// REMOVE PASSWORD FROM USER
+// =====================================================
+
+const removePassword = (user) => {
+  if (!user) {
+    return null;
+  }
+
+  const userObject = user.toObject
+    ? user.toObject()
+    : { ...user };
+
+  const {
+    password,
+    ...userData
+  } = userObject;
+
+  return userData;
+};
+
+// =====================================================
+// SET AUTH COOKIE
+// =====================================================
+
+const setAuthCookie = (res, token) => {
+  res.cookie(
+    "access_token",
+    token,
+    COOKIE_OPTIONS
+  );
+
+  return res;
+};
+
+// =====================================================
+// TEST AUTH ROUTE
+// =====================================================
+
+export const test = (req, res) => {
+  return res.status(200).json({
+    success: true,
+    message: "Auth route is working!",
+  });
+};
+
+// =====================================================
+// USER SIGN UP
+// =====================================================
+
+export const signup = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const {
+      username,
+      email,
+      password,
+    } = req.body;
+
+    console.log("=================================");
+    console.log("USER SIGNUP REQUEST:");
+
+    console.log({
+      username,
+      email,
+      passwordProvided: Boolean(password),
+    });
+
+    console.log("=================================");
+
+    // =================================================
+    // VALIDATE INPUT
+    // =================================================
+
+    if (
+      typeof username !== "string" ||
+      typeof email !== "string" ||
+      typeof password !== "string"
+    ) {
       return next(
-        errorHandler(400, "Please provide username, email and password")
+        errorHandler(
+          400,
+          "Please provide username, email and password."
+        )
       );
     }
 
-    const existingUser = await User.findOne({
-      $or: [{ username }, { email }],
-    });
+    const normalizedUsername =
+      username.trim();
+
+    const normalizedEmail =
+      email.trim().toLowerCase();
+
+    const cleanPassword =
+      password.trim();
+
+    if (
+      !normalizedUsername ||
+      !normalizedEmail ||
+      !cleanPassword
+    ) {
+      return next(
+        errorHandler(
+          400,
+          "Please provide valid username, email and password."
+        )
+      );
+    }
+
+    if (cleanPassword.length < 6) {
+      return next(
+        errorHandler(
+          400,
+          "Password must be at least 6 characters."
+        )
+      );
+    }
+
+    // =================================================
+    // CHECK EXISTING USER
+    // =================================================
+
+    const existingUser =
+      await User.findOne({
+        $or: [
+          {
+            username:
+              normalizedUsername,
+          },
+          {
+            email:
+              normalizedEmail,
+          },
+        ],
+      });
 
     if (existingUser) {
-      return next(errorHandler(400, "Username or email already exists"));
+      if (
+        existingUser.email ===
+        normalizedEmail
+      ) {
+        return next(
+          errorHandler(
+            400,
+            "Email already exists."
+          )
+        );
+      }
+
+      return next(
+        errorHandler(
+          400,
+          "Username already exists."
+        )
+      );
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // =================================================
+    // HASH PASSWORD
+    // =================================================
 
-    const newUser = new User({
-      username,
-      email,
-      password: hashedPassword,
-    });
-
-    await newUser.save();
-
-    res.status(201).json({
-      success: true,
-      message: "User created successfully",
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// =========================
-// SIGN IN
-// =========================
-export const signin = async (req, res, next) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return next(errorHandler(400, "Please provide email and password"));
-    }
-
-    const validUser = await User.findOne({ email });
-
-    if (!validUser) {
-      return next(errorHandler(404, "User not found"));
-    }
-
-    const validPassword = await bcrypt.compare(password, validUser.password);
-
-    if (!validPassword) {
-      return next(errorHandler(401, "Wrong credentials"));
-    }
-
-    // Standardized token payload to include both id and _id
-    const token = jwt.sign(
-      { id: validUser._id, _id: validUser._id },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
-
-    const { password: hashedPassword, ...userData } = validUser._doc;
-
-    res
-      .cookie("access_token", token, COOKIE_OPTIONS)
-      .status(200)
-      .json(userData); // Sending user object directly to match Redux currentUser
-  } catch (error) {
-    next(error);
-  }
-};
-
-// =========================
-// GOOGLE SIGN IN
-// =========================
-export const google = async (req, res, next) => {
-  try {
-    const { email, name, photo } = req.body;
-
-    if (!email) {
-      return next(errorHandler(400, "Google email is required"));
-    }
-
-    const user = await User.findOne({ email });
-
-    if (user) {
-      const token = jwt.sign(
-        { id: user._id, _id: user._id },
-        process.env.JWT_SECRET,
-        { expiresIn: "1d" }
+    const hashedPassword =
+      await bcrypt.hash(
+        cleanPassword,
+        10
       );
 
-      const { password, ...rest } = user._doc;
-
-      return res
-        .cookie("access_token", token, COOKIE_OPTIONS)
-        .status(200)
-        .json(rest);
-    }
-
-    const baseUsername = name
-      ? name.split(" ").join("").toLowerCase()
-      : "user";
-
-    const randomNumber = Math.floor(10000 + Math.random() * 90000);
-    const username = `${baseUsername}${randomNumber}`;
-
-    const generatedPassword = Math.random().toString(36).slice(-8);
-    const hashedPassword = await bcrypt.hash(generatedPassword, 10);
+    // =================================================
+    // CREATE NORMAL USER
+    // =================================================
 
     const newUser = new User({
-      username,
-      email,
-      password: hashedPassword,
-      avatar: photo,
+      username:
+        normalizedUsername,
+
+      email:
+        normalizedEmail,
+
+      password:
+        hashedPassword,
+
+      role: "user",
     });
 
     await newUser.save();
 
-    const token = jwt.sign(
-      { id: newUser._id, _id: newUser._id },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
+    console.log(
+      "✅ USER CREATED SUCCESSFULLY:",
+      {
+        id: newUser._id.toString(),
+        username: newUser.username,
+        email: newUser.email,
+        role: newUser.role,
+      }
     );
 
-    const { password, ...rest } = newUser._doc;
+    console.log("=================================");
 
-    return res
-      .cookie("access_token", token, COOKIE_OPTIONS)
-      .status(200)
-      .json(rest);
-  } catch (error) {
-    next(error);
-  }
-};
-
-// =========================
-// SIGN OUT
-// =========================
-export const signOut = async (req, res, next) => {
-  try {
-    res.clearCookie("access_token");
-
-    return res.status(200).json({
+    return res.status(201).json({
       success: true,
-      message: "User has been logged out!",
+      message:
+        "User created successfully.",
     });
   } catch (error) {
+    console.error(
+      "❌ SIGNUP ERROR:",
+      error
+    );
+
     next(error);
   }
 };
+
+// =====================================================
+// ADMIN SIGN UP
+// =====================================================
+
+export const adminSignup = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const {
+      username,
+      email,
+      password,
+    } = req.body;
+
+    console.log("=================================");
+    console.log("ADMIN SIGNUP REQUEST:");
+
+    console.log({
+      username,
+      email,
+      passwordProvided: Boolean(password),
+    });
+
+    console.log("=================================");
+
+    // =================================================
+    // VALIDATE INPUT
+    // =================================================
+
+    if (
+      typeof username !== "string" ||
+      typeof email !== "string" ||
+      typeof password !== "string"
+    ) {
+      return next(
+        errorHandler(
+          400,
+          "Please provide username, email and password."
+        )
+      );
+    }
+
+    const normalizedUsername =
+      username.trim();
+
+    const normalizedEmail =
+      email.trim().toLowerCase();
+
+    const cleanPassword =
+      password.trim();
+
+    if (
+      !normalizedUsername ||
+      !normalizedEmail ||
+      !cleanPassword
+    ) {
+      return next(
+        errorHandler(
+          400,
+          "Please provide valid username, email and password."
+        )
+      );
+    }
+
+    if (cleanPassword.length < 6) {
+      return next(
+        errorHandler(
+          400,
+          "Password must be at least 6 characters."
+        )
+      );
+    }
+
+    // =================================================
+    // CHECK EXISTING ACCOUNT
+    // =================================================
+
+    const existingUser =
+      await User.findOne({
+        $or: [
+          {
+            username:
+              normalizedUsername,
+          },
+          {
+            email:
+              normalizedEmail,
+          },
+        ],
+      });
+
+    if (existingUser) {
+      if (
+        existingUser.email ===
+        normalizedEmail
+      ) {
+        return next(
+          errorHandler(
+            400,
+            "Email already exists."
+          )
+        );
+      }
+
+      return next(
+        errorHandler(
+          400,
+          "Username already exists."
+        )
+      );
+    }
+
+    // =================================================
+    // HASH PASSWORD
+    // =================================================
+
+    const hashedPassword =
+      await bcrypt.hash(
+        cleanPassword,
+        10
+      );
+
+    // =================================================
+    // CREATE ADMIN
+    // =================================================
+
+    const newAdmin = new User({
+      username:
+        normalizedUsername,
+
+      email:
+        normalizedEmail,
+
+      password:
+        hashedPassword,
+
+      role: "admin",
+    });
+
+    await newAdmin.save();
+
+    console.log(
+      "✅ ADMIN CREATED SUCCESSFULLY:",
+      {
+        id: newAdmin._id.toString(),
+        username: newAdmin.username,
+        email: newAdmin.email,
+        role: newAdmin.role,
+      }
+    );
+
+    console.log("=================================");
+
+    return res.status(201).json({
+      success: true,
+      message:
+        "Admin account created successfully.",
+    });
+  } catch (error) {
+    console.error(
+      "❌ ADMIN SIGNUP ERROR:",
+      error
+    );
+
+    next(error);
+  }
+};
+
+// =====================================================
+// USER SIGN IN
+// =====================================================
+
+export const signin = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const {
+      email,
+      password,
+    } = req.body;
+
+    console.log("=================================");
+    console.log("USER SIGNIN REQUEST");
+
+    console.log({
+      email,
+      passwordProvided:
+        Boolean(password),
+    });
+
+    // =================================================
+    // VALIDATE INPUT
+    // =================================================
+
+    if (
+      typeof email !== "string" ||
+      typeof password !== "string"
+    ) {
+      return next(
+        errorHandler(
+          400,
+          "Please provide email and password."
+        )
+      );
+    }
+
+    const normalizedEmail =
+      email.trim().toLowerCase();
+
+    const cleanPassword =
+      password.trim();
+
+    if (
+      !normalizedEmail ||
+      !cleanPassword
+    ) {
+      return next(
+        errorHandler(
+          400,
+          "Please provide email and password."
+        )
+      );
+    }
+
+    // =================================================
+    // FIND USER
+    // =================================================
+
+    const validUser =
+      await User.findOne({
+        email: normalizedEmail,
+      });
+
+    console.log(
+      "USER FOUND:",
+      Boolean(validUser)
+    );
+
+    // =================================================
+    // USER NOT FOUND
+    // =================================================
+
+    if (!validUser) {
+      console.log(
+        "❌ NO USER FOUND FOR:",
+        normalizedEmail
+      );
+
+      return next(
+        errorHandler(
+          401,
+          "Wrong credentials."
+        )
+      );
+    }
+
+    console.log(
+      "USER DETAILS:",
+      {
+        id: validUser._id.toString(),
+        email: validUser.email,
+        username: validUser.username,
+        role:
+          validUser.role || "user",
+        hasPassword:
+          Boolean(validUser.password),
+      }
+    );
+
+    // =================================================
+    // ADMIN PROTECTION
+    // =================================================
+
+    if (
+      validUser.role === "admin"
+    ) {
+      console.log(
+        "❌ ADMIN ATTEMPTED USER LOGIN"
+      );
+
+      return next(
+        errorHandler(
+          403,
+          "Admin accounts must use the admin sign-in option."
+        )
+      );
+    }
+
+    // =================================================
+    // CHECK PASSWORD EXISTS
+    // =================================================
+
+    if (!validUser.password) {
+      return next(
+        errorHandler(
+          400,
+          "This account does not have a password. Please use Google Sign In."
+        )
+      );
+    }
+
+    // =================================================
+    // COMPARE PASSWORD
+    // =================================================
+
+    const validPassword =
+      await bcrypt.compare(
+        cleanPassword,
+        validUser.password
+      );
+
+    console.log(
+      "PASSWORD MATCH:",
+      validPassword
+    );
+
+    if (!validPassword) {
+      console.log(
+        "❌ PASSWORD DOES NOT MATCH"
+      );
+
+      return next(
+        errorHandler(
+          401,
+          "Wrong credentials."
+        )
+      );
+    }
+
+    // =================================================
+    // CREATE JWT
+    // =================================================
+
+    const token =
+      createToken(validUser);
+
+    const userData =
+      removePassword(validUser);
+
+    console.log(
+      "✅ USER LOGIN SUCCESS:",
+      {
+        id: validUser._id.toString(),
+        email: validUser.email,
+        username: validUser.username,
+        role:
+          validUser.role || "user",
+      }
+    );
+
+    // =================================================
+    // SEND COOKIE + USER
+    // =================================================
+
+    return setAuthCookie(
+      res,
+      token
+    )
+      .status(200)
+      .json({
+        success: true,
+        message:
+          "Signed in successfully.",
+        user: userData,
+      });
+  } catch (error) {
+    console.error(
+      "❌ USER SIGNIN ERROR:",
+      error
+    );
+
+    next(error);
+  }
+};
+
+// =====================================================
+// ADMIN SIGN IN
+// =====================================================
+
+export const adminSignin = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const {
+      email,
+      password,
+    } = req.body;
+
+    console.log("=================================");
+    console.log("ADMIN SIGNIN REQUEST");
+
+    // =================================================
+    // VALIDATE INPUT
+    // =================================================
+
+    if (
+      typeof email !== "string" ||
+      typeof password !== "string"
+    ) {
+      return next(
+        errorHandler(
+          400,
+          "Please provide admin email and password."
+        )
+      );
+    }
+
+    const normalizedEmail =
+      email.trim().toLowerCase();
+
+    const cleanPassword =
+      password.trim();
+
+    if (
+      !normalizedEmail ||
+      !cleanPassword
+    ) {
+      return next(
+        errorHandler(
+          400,
+          "Please provide admin email and password."
+        )
+      );
+    }
+
+    // =================================================
+    // FIND ADMIN
+    // =================================================
+
+    const admin =
+      await User.findOne({
+        email: normalizedEmail,
+      });
+
+    if (!admin) {
+      return next(
+        errorHandler(
+          401,
+          "Wrong admin credentials."
+        )
+      );
+    }
+
+    console.log(
+      "ADMIN ACCOUNT FOUND:",
+      {
+        id: admin._id.toString(),
+        email: admin.email,
+        role: admin.role,
+        hasPassword:
+          Boolean(admin.password),
+      }
+    );
+
+    // =================================================
+    // VERIFY ADMIN ROLE
+    // =================================================
+
+    if (
+      admin.role !== "admin"
+    ) {
+      return next(
+        errorHandler(
+          403,
+          "You do not have administrator access."
+        )
+      );
+    }
+
+    // =================================================
+    // VERIFY PASSWORD EXISTS
+    // =================================================
+
+    if (!admin.password) {
+      return next(
+        errorHandler(
+          400,
+          "Admin account does not have a password."
+        )
+      );
+    }
+
+    // =================================================
+    // VERIFY PASSWORD
+    // =================================================
+
+    const validPassword =
+      await bcrypt.compare(
+        cleanPassword,
+        admin.password
+      );
+
+    console.log(
+      "ADMIN PASSWORD MATCH:",
+      validPassword
+    );
+
+    if (!validPassword) {
+      return next(
+        errorHandler(
+          401,
+          "Wrong admin credentials."
+        )
+      );
+    }
+
+    // =================================================
+    // CREATE JWT
+    // =================================================
+
+    const token =
+      createToken(admin);
+
+    const adminData =
+      removePassword(admin);
+
+    console.log(
+      "✅ ADMIN LOGIN SUCCESS:",
+      admin.email
+    );
+
+    console.log("=================================");
+
+    return setAuthCookie(
+      res,
+      token
+    )
+      .status(200)
+      .json({
+        success: true,
+        message:
+          "Admin signed in successfully.",
+        user: adminData,
+      });
+  } catch (error) {
+    console.error(
+      "❌ ADMIN SIGNIN ERROR:",
+      error
+    );
+
+    next(error);
+  }
+};
+
+// =====================================================
+// GOOGLE SIGN IN
+// =====================================================
+
+export const google = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const {
+      email,
+      name,
+      photo,
+    } = req.body;
+
+    if (
+      typeof email !== "string" ||
+      !email.trim()
+    ) {
+      return next(
+        errorHandler(
+          400,
+          "Google email is required."
+        )
+      );
+    }
+
+    const normalizedEmail =
+      email.trim().toLowerCase();
+
+    // =================================================
+    // FIND EXISTING USER
+    // =================================================
+
+    let user =
+      await User.findOne({
+        email: normalizedEmail,
+      });
+
+    // =================================================
+    // EXISTING USER
+    // =================================================
+
+    if (user) {
+      if (
+        user.role === "admin"
+      ) {
+        return next(
+          errorHandler(
+            403,
+            "Admin accounts must use the admin sign-in option."
+          )
+        );
+      }
+
+      if (
+        photo &&
+        photo !== user.avatar
+      ) {
+        user.avatar = photo;
+
+        await user.save();
+      }
+
+      const token =
+        createToken(user);
+
+      const userData =
+        removePassword(user);
+
+      return setAuthCookie(
+        res,
+        token
+      )
+        .status(200)
+        .json({
+          success: true,
+          message:
+            "Google sign in successful.",
+          user: userData,
+        });
+    }
+
+    // =================================================
+    // CREATE NEW GOOGLE USER
+    // =================================================
+
+    let baseUsername = name
+      ? name
+          .trim()
+          .replace(/\s+/g, "")
+          .toLowerCase()
+      : "googleuser";
+
+    baseUsername =
+      baseUsername.replace(
+        /[^a-zA-Z0-9]/g,
+        ""
+      );
+
+    if (!baseUsername) {
+      baseUsername =
+        "googleuser";
+    }
+
+    // =================================================
+    // UNIQUE USERNAME
+    // =================================================
+
+    let username = "";
+    let usernameExists = true;
+
+    while (usernameExists) {
+      const randomNumber =
+        Math.floor(
+          10000 +
+            Math.random() *
+              90000
+        );
+
+      username =
+        `${baseUsername}${randomNumber}`;
+
+      const existingUsername =
+        await User.findOne({
+          username,
+        });
+
+      usernameExists =
+        Boolean(existingUsername);
+    }
+
+    // =================================================
+    // RANDOM PASSWORD
+    // =================================================
+
+    const generatedPassword =
+      crypto
+        .randomBytes(32)
+        .toString("hex");
+
+    const hashedPassword =
+      await bcrypt.hash(
+        generatedPassword,
+        10
+      );
+
+    // =================================================
+    // CREATE USER
+    // =================================================
+
+    user = new User({
+      username,
+
+      email:
+        normalizedEmail,
+
+      password:
+        hashedPassword,
+
+      avatar:
+        photo ||
+        "https://cdn-icons-png.flaticon.com/512/149/149071.png",
+
+      role: "user",
+    });
+
+    await user.save();
+
+    console.log(
+      "NEW GOOGLE USER CREATED:",
+      user.email
+    );
+
+    // =================================================
+    // CREATE JWT
+    // =================================================
+
+    const token =
+      createToken(user);
+
+    const userData =
+      removePassword(user);
+
+    return setAuthCookie(
+      res,
+      token
+    )
+      .status(200)
+      .json({
+        success: true,
+        message:
+          "Google sign in successful.",
+        user: userData,
+      });
+  } catch (error) {
+    console.error(
+      "❌ GOOGLE SIGN IN ERROR:",
+      error
+    );
+
+    next(error);
+  }
+};
+
+// =====================================================
+// SIGN OUT
+// =====================================================
+
+export const signOut = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    return res
+      .clearCookie(
+        "access_token",
+        {
+          httpOnly:
+            COOKIE_OPTIONS.httpOnly,
+
+          sameSite:
+            COOKIE_OPTIONS.sameSite,
+
+          secure:
+            COOKIE_OPTIONS.secure,
+        }
+      )
+      .status(200)
+      .json({
+        success: true,
+        message:
+          "User has been logged out!",
+      });
+  } catch (error) {
+    console.error(
+      "❌ SIGNOUT ERROR:",
+      error
+    );
+
+    next(error);
+  }
+};
+

@@ -1,20 +1,81 @@
+
+import dotenv from "dotenv";
 import express from "express";
 import mongoose from "mongoose";
-import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 
-import userRoutes from "./routes/user.routes.js";
+// =====================================================
+// LOAD ENVIRONMENT VARIABLES
+// =====================================================
+
+dotenv.config({
+  path: "./api/.env",
+});
+
+// =====================================================
+// ENVIRONMENT CHECK
+// =====================================================
+
+console.log("=================================");
+console.log("ENVIRONMENT CHECK");
+console.log("=================================");
+
+console.log(
+  "MONGO:",
+  process.env.MONGO ? "LOADED" : "NOT LOADED"
+);
+
+console.log(
+  "RESEND API KEY:",
+  process.env.RESEND_API_KEY
+    ? "LOADED"
+    : "NOT LOADED"
+);
+
+console.log(
+  "RESEND FROM:",
+  process.env.RESEND_FROM_EMAIL || "NOT SET"
+);
+
+console.log(
+  "INQUIRY RECEIVER:",
+  process.env.INQUIRY_RECEIVER_EMAIL || "NOT SET"
+);
+
+console.log("=================================");
+
+// =====================================================
+// ROUTES
+// =====================================================
+
 import authRoutes from "./routes/auth.route.js";
 import listingRoutes from "./routes/listing.route.js";
+import userRoutes from "./routes/user.route.js";
+import favoriteRoutes from "./routes/favorite.route.js";
+import inquiryRoutes from "./routes/inquiry.route.js";
+import adminRoutes from "./routes/admin.route.js";
 
-dotenv.config();
+
+// =====================================================
+// APP
+// =====================================================
 
 const app = express();
 
-// =========================
+// =====================================================
 // MIDDLEWARE
-// =========================
+// =====================================================
+
+// Parse JSON requests
+app.use(express.json());
+
+// Parse cookies
+app.use(cookieParser());
+
+// =====================================================
+// CORS
+// =====================================================
 
 app.use(
   cors({
@@ -23,58 +84,79 @@ app.use(
   })
 );
 
-app.use(express.json());
-app.use(cookieParser());
-
-// =========================
-// DATABASE
-// =========================
-
-mongoose
-  .connect(process.env.MONGO)
-  .then(() => {
-    console.log("✅ Connected to MongoDB");
-  })
-  .catch((err) => {
-    console.error("❌ MongoDB connection error:", err);
-  });
-
-// =========================
+// =====================================================
 // ROUTES
-// =========================
+// =====================================================
+
+app.use("/api/auth", authRoutes);
+
+app.use("/api/listing", listingRoutes);
+
+app.use("/api/user", userRoutes);
+
+app.use("/api/favorite", favoriteRoutes);
+
+// FIXED: inquiry route is singular
+app.use("/api/inquiry", inquiryRoutes);
+
+app.use("/api/admin", adminRoutes);
+
+// =====================================================
+// ROOT TEST
+// =====================================================
 
 app.get("/", (req, res) => {
-  res.json({
+  res.status(200).json({
+    success: true,
     message: "PrimePlaceEstate API is running",
   });
 });
 
-// Fixed route prefix from /api/users to /api/user
-app.use("/api/user", userRoutes);
-app.use("/api/auth", authRoutes);
-app.use("/api/listing", listingRoutes);
-
-// =========================
+// =====================================================
 // ERROR HANDLER
-// =========================
+// =====================================================
 
 app.use((err, req, res, next) => {
-  const statusCode = err.statusCode || 500;
-  const message = err.message || "Internal Server Error";
+  const statusCode =
+    err.statusCode || 500;
 
-  console.error("❌ Error:", err);
+  const message =
+    err.message ||
+    "Internal Server Error";
 
-  return res.status(statusCode).json({
+  console.error(
+    "SERVER ERROR:",
+    err
+  );
+
+  res.status(statusCode).json({
     success: false,
     statusCode,
     message,
   });
 });
 
-// =========================
-// START SERVER
-// =========================
+// =====================================================
+// MONGODB CONNECTION + SERVER
+// =====================================================
 
-app.listen(3000, () => {
-  console.log("🚀 Server is running on port 3000");
-});
+mongoose
+  .connect(process.env.MONGO)
+  .then(() => {
+    console.log(
+      "✅ Connected to MongoDB"
+    );
+
+    app.listen(3000, () => {
+      console.log(
+        "🚀 Server running on port 3000"
+      );
+    });
+  })
+  .catch((error) => {
+    console.error(
+      "❌ MongoDB connection error:",
+      error
+    );
+  });
+
