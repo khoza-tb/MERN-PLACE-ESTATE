@@ -303,33 +303,43 @@ export default function Profile() {
   =========================================================
   */
 
-  
-const handleSignOut = async () => {
-  try {
-    const res = await fetch("/api/auth/signout", {
-      method: "POST",
-      credentials: "include",
-    });
+  const handleSignOut = async () => {
+    try {
+      dispatch(signOutUserStart());
 
-    const data = await res.json();
+      const res = await fetch("/api/auth/signout", {
+        method: "GET",
+        credentials: "include",
+      });
 
-    if (!res.ok || data.success === false) {
-      throw new Error(data.message || "Failed to sign out");
+      const data = await res.json();
+
+      console.log("SIGN OUT RESPONSE:", data);
+
+      if (!res.ok || data.success === false) {
+        dispatch(
+          signOutUserFailure(
+            data.message || "Failed to sign out."
+          )
+        );
+
+        return;
+      }
+
+      dispatch(signOutUserSuccess());
+
+      navigate("/signin");
+    } catch (error) {
+      console.error("SIGN OUT ERROR:", error);
+
+      dispatch(
+        signOutUserFailure(
+          error.message ||
+            "Something went wrong while signing out."
+        )
+      );
     }
-
-    console.log("SIGNED OUT SUCCESSFULLY");
-
-    // Clear local user state if you are storing it in localStorage
-    localStorage.removeItem("user");
-
-    // Redirect to sign-in page
-    navigate("/signin");
-  } catch (error) {
-    console.error("SIGN OUT ERROR:", error);
-  }
-};
-
-
+  };
 
   /*
   =========================================================

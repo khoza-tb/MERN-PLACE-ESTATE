@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -41,10 +40,10 @@ export default function CreateListing() {
   const [loading, setLoading] = useState(false);
 
   const CLOUD_NAME =
-    import.meta.env.VITE_CLOUDINARY_CLOUD_NAME?.trim();
+    import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 
   const UPLOAD_PRESET =
-    import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET?.trim();
+    import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
   // =========================================================
   // GEOCODE ADDRESS
@@ -186,14 +185,10 @@ export default function CreateListing() {
 
       setFiles([]);
     } catch (err) {
-      console.error(
-        "IMAGE UPLOAD ERROR:",
-        err
-      );
+      console.error(err);
 
       setError(
-        err?.message ||
-          "Image upload failed. Please try again."
+        "Image upload failed. Please try again."
       );
     } finally {
       setUploading(false);
@@ -205,24 +200,6 @@ export default function CreateListing() {
   // =========================================================
 
   const storeImage = async (file) => {
-    if (!CLOUD_NAME) {
-      throw new Error(
-        "Cloudinary cloud name is missing. Check VITE_CLOUDINARY_CLOUD_NAME in your frontend .env file."
-      );
-    }
-
-    if (!UPLOAD_PRESET) {
-      throw new Error(
-        "Cloudinary upload preset is missing. Check VITE_CLOUDINARY_UPLOAD_PRESET in your frontend .env file."
-      );
-    }
-
-    if (!file) {
-      throw new Error(
-        "No image file was selected."
-      );
-    }
-
     const data = new FormData();
 
     data.append("file", file);
@@ -231,16 +208,8 @@ export default function CreateListing() {
       UPLOAD_PRESET
     );
 
-    const uploadUrl =
-      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
-
-    console.log(
-      "Uploading image to Cloudinary:",
-      uploadUrl
-    );
-
     const response = await fetch(
-      uploadUrl,
+      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
       {
         method: "POST",
         body: data,
@@ -250,38 +219,13 @@ export default function CreateListing() {
     const result =
       await response.json();
 
-    console.log(
-      "CLOUDINARY RESPONSE:",
-      result
-    );
-
-    if (!response.ok) {
-      const cloudinaryMessage =
-        result?.error?.message ||
-        "Cloudinary upload failed.";
-
-      if (
-        cloudinaryMessage
-          .toLowerCase()
-          .includes("cloud_name is disabled")
-      ) {
-        throw new Error(
-          "Cloudinary has disabled this cloud name. Check VITE_CLOUDINARY_CLOUD_NAME in your .env file and make sure it is your active Cloudinary cloud name."
-        );
-      }
-
-      throw new Error(
-        cloudinaryMessage
-      );
-    }
-
-    if (result?.secure_url) {
+    if (result.secure_url) {
       return result.secure_url;
     }
 
     throw new Error(
-      result?.error?.message ||
-        "Cloudinary did not return an image URL."
+      result.error?.message ||
+        "Upload failed"
     );
   };
 

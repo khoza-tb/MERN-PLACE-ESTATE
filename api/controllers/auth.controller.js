@@ -1,4 +1,3 @@
-
 import User from "../models/user.models.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -88,7 +87,7 @@ export const test = (req, res) => {
 };
 
 // =====================================================
-// USER SIGN UP
+// SIGN UP
 // =====================================================
 
 export const signup = async (
@@ -103,16 +102,24 @@ export const signup = async (
       password,
     } = req.body;
 
-    console.log("=================================");
-    console.log("USER SIGNUP REQUEST:");
+    console.log(
+      "================================="
+    );
+
+    console.log(
+      "USER SIGNUP REQUEST:"
+    );
 
     console.log({
       username,
       email,
-      passwordProvided: Boolean(password),
+      passwordProvided:
+        Boolean(password),
     });
 
-    console.log("=================================");
+    console.log(
+      "================================="
+    );
 
     // =================================================
     // VALIDATE INPUT
@@ -211,6 +218,11 @@ export const signup = async (
         10
       );
 
+    console.log(
+      "PASSWORD HASH CREATED:",
+      hashedPassword.substring(0, 10) + "..."
+    );
+
     // =================================================
     // CREATE NORMAL USER
     // =================================================
@@ -231,7 +243,7 @@ export const signup = async (
     await newUser.save();
 
     console.log(
-      "✅ USER CREATED SUCCESSFULLY:",
+      "USER CREATED SUCCESSFULLY:",
       {
         id: newUser._id.toString(),
         username: newUser.username,
@@ -240,7 +252,9 @@ export const signup = async (
       }
     );
 
-    console.log("=================================");
+    console.log(
+      "================================="
+    );
 
     return res.status(201).json({
       success: true,
@@ -250,176 +264,6 @@ export const signup = async (
   } catch (error) {
     console.error(
       "❌ SIGNUP ERROR:",
-      error
-    );
-
-    next(error);
-  }
-};
-
-// =====================================================
-// ADMIN SIGN UP
-// =====================================================
-
-export const adminSignup = async (
-  req,
-  res,
-  next
-) => {
-  try {
-    const {
-      username,
-      email,
-      password,
-    } = req.body;
-
-    console.log("=================================");
-    console.log("ADMIN SIGNUP REQUEST:");
-
-    console.log({
-      username,
-      email,
-      passwordProvided: Boolean(password),
-    });
-
-    console.log("=================================");
-
-    // =================================================
-    // VALIDATE INPUT
-    // =================================================
-
-    if (
-      typeof username !== "string" ||
-      typeof email !== "string" ||
-      typeof password !== "string"
-    ) {
-      return next(
-        errorHandler(
-          400,
-          "Please provide username, email and password."
-        )
-      );
-    }
-
-    const normalizedUsername =
-      username.trim();
-
-    const normalizedEmail =
-      email.trim().toLowerCase();
-
-    const cleanPassword =
-      password.trim();
-
-    if (
-      !normalizedUsername ||
-      !normalizedEmail ||
-      !cleanPassword
-    ) {
-      return next(
-        errorHandler(
-          400,
-          "Please provide valid username, email and password."
-        )
-      );
-    }
-
-    if (cleanPassword.length < 6) {
-      return next(
-        errorHandler(
-          400,
-          "Password must be at least 6 characters."
-        )
-      );
-    }
-
-    // =================================================
-    // CHECK EXISTING ACCOUNT
-    // =================================================
-
-    const existingUser =
-      await User.findOne({
-        $or: [
-          {
-            username:
-              normalizedUsername,
-          },
-          {
-            email:
-              normalizedEmail,
-          },
-        ],
-      });
-
-    if (existingUser) {
-      if (
-        existingUser.email ===
-        normalizedEmail
-      ) {
-        return next(
-          errorHandler(
-            400,
-            "Email already exists."
-          )
-        );
-      }
-
-      return next(
-        errorHandler(
-          400,
-          "Username already exists."
-        )
-      );
-    }
-
-    // =================================================
-    // HASH PASSWORD
-    // =================================================
-
-    const hashedPassword =
-      await bcrypt.hash(
-        cleanPassword,
-        10
-      );
-
-    // =================================================
-    // CREATE ADMIN
-    // =================================================
-
-    const newAdmin = new User({
-      username:
-        normalizedUsername,
-
-      email:
-        normalizedEmail,
-
-      password:
-        hashedPassword,
-
-      role: "admin",
-    });
-
-    await newAdmin.save();
-
-    console.log(
-      "✅ ADMIN CREATED SUCCESSFULLY:",
-      {
-        id: newAdmin._id.toString(),
-        username: newAdmin.username,
-        email: newAdmin.email,
-        role: newAdmin.role,
-      }
-    );
-
-    console.log("=================================");
-
-    return res.status(201).json({
-      success: true,
-      message:
-        "Admin account created successfully.",
-    });
-  } catch (error) {
-    console.error(
-      "❌ ADMIN SIGNUP ERROR:",
       error
     );
 
@@ -442,8 +286,13 @@ export const signin = async (
       password,
     } = req.body;
 
-    console.log("=================================");
-    console.log("USER SIGNIN REQUEST");
+    console.log(
+      "================================="
+    );
+
+    console.log(
+      "USER SIGNIN REQUEST"
+    );
 
     console.log({
       email,
@@ -509,6 +358,10 @@ export const signin = async (
         normalizedEmail
       );
 
+      console.log(
+        "================================="
+      );
+
       return next(
         errorHandler(
           401,
@@ -554,6 +407,10 @@ export const signin = async (
     // =================================================
 
     if (!validUser.password) {
+      console.log(
+        "❌ USER HAS NO PASSWORD"
+      );
+
       return next(
         errorHandler(
           400,
@@ -561,6 +418,18 @@ export const signin = async (
         )
       );
     }
+
+    // =================================================
+    // CHECK PASSWORD HASH FORMAT
+    // =================================================
+
+    console.log(
+      "PASSWORD HASH:",
+      validUser.password.substring(
+        0,
+        10
+      ) + "..."
+    );
 
     // =================================================
     // COMPARE PASSWORD
@@ -577,9 +446,17 @@ export const signin = async (
       validPassword
     );
 
+    // =================================================
+    // WRONG PASSWORD
+    // =================================================
+
     if (!validPassword) {
       console.log(
         "❌ PASSWORD DOES NOT MATCH"
+      );
+
+      console.log(
+        "================================="
       );
 
       return next(
@@ -597,11 +474,19 @@ export const signin = async (
     const token =
       createToken(validUser);
 
+    console.log(
+      "✅ JWT CREATED"
+    );
+
+    // =================================================
+    // REMOVE PASSWORD
+    // =================================================
+
     const userData =
       removePassword(validUser);
 
     console.log(
-      "✅ USER LOGIN SUCCESS:",
+      "USER LOGIN SUCCESS:",
       {
         id: validUser._id.toString(),
         email: validUser.email,
@@ -609,6 +494,10 @@ export const signin = async (
         role:
           validUser.role || "user",
       }
+    );
+
+    console.log(
+      "================================="
     );
 
     // =================================================
@@ -651,8 +540,13 @@ export const adminSignin = async (
       password,
     } = req.body;
 
-    console.log("=================================");
-    console.log("ADMIN SIGNIN REQUEST");
+    console.log(
+      "================================="
+    );
+
+    console.log(
+      "ADMIN SIGNIN REQUEST"
+    );
 
     // =================================================
     // VALIDATE INPUT
@@ -784,7 +678,9 @@ export const adminSignin = async (
       admin.email
     );
 
-    console.log("=================================");
+    console.log(
+      "================================="
+    );
 
     return setAuthCookie(
       res,
@@ -852,6 +748,7 @@ export const google = async (
     // =================================================
 
     if (user) {
+      // Admin cannot use Google login
       if (
         user.role === "admin"
       ) {
@@ -863,6 +760,7 @@ export const google = async (
         );
       }
 
+      // Update avatar if changed
       if (
         photo &&
         photo !== user.avatar
@@ -1052,4 +950,3 @@ export const signOut = async (
     next(error);
   }
 };
-
